@@ -1,53 +1,126 @@
-# About `pokeemerald-expansion`
+# PokeRando — a randomized pokeemerald++
 
-![Gif that shows debugging functionality that is unique to pokeemerald-expansion such as rerolling Trainer ID, Cheat Start, PC from Debug Menu, Debug PC Fill, Pokémon Sprite Visualizer, Debug Warp to Map, and Battle Debug Menu](https://github.com/user-attachments/assets/cf9dfbee-4c6b-4bca-8e0a-07f116ef891c) ![Gif that shows overworld functionality that is unique to pokeemerald-expansion such as indoor running, BW2 style map popups, overworld followers, DNA Splicers, Gen 1 style fishing, OW Item descriptions, Quick Run from Battle, Use Last Ball, Wild Double Battles, and Catch from EXP](https://github.com/user-attachments/assets/383af243-0904-4d41-bced-721492fbc48e) ![Gif that shows off a number of modern Pokémon battle mechanics happening in the pokeemerald-expansion engine: 2 vs 1 battles, modern Pokémon, items, moves, abilities, fully customizable opponents and partners, Trainer Slides, and generational gimmicks](https://github.com/user-attachments/assets/50c576bc-415e-4d66-a38f-ad712f3316be)
+Generate your own **randomized** version of this Pokémon game. It shuffles
+**wild Pokémon, trainer teams, and starters** — including the extra Pokémon this
+fork adds — and builds a `.gba` you can play in an emulator or on a flashcart.
 
-<!-- If you want to re-record or change these gifs, here are some notes that I used: https://files.catbox.moe/05001g.md -->
+There are **two ways** to make a randomized ROM. Pick whichever suits you:
 
-**`pokeemerald-expansion`** is a GBA ROM hack base that equips developers with a comprehensive toolkit for creating Pokémon ROM hacks. **`pokeemerald-expansion`** is built on top of [pret's `pokeemerald`](https://github.com/pret/pokeemerald) decompilation project. **It is not a playable Pokémon game on its own.**
+| Way | Best for | Install needed |
+|-----|----------|----------------|
+| **A. GitHub Actions** | Anyone — works in the browser | Nothing (just a GitHub account) |
+| **B. Double-click `.bat`** | Windows users who want it local | WSL, one-time setup |
 
-# [Features](FEATURES.md)
+---
 
-**`pokeemerald-expansion`** offers hundreds of features from various [core series Pokémon games](https://bulbapedia.bulbagarden.net/wiki/Core_series), along with popular quality-of-life enhancements designed to streamline development and improve the player experience. A full list of those features can be found in [`FEATURES.md`](FEATURES.md).
+## Option A — Make a ROM in your browser (no install)
 
-# [Credits](CREDITS.md)
+1. **Fork** this repo — click **Fork** (top-right of the GitHub page).
+2. On your fork, open the **Actions** tab. If prompted, click
+   **"I understand my workflows, go ahead and enable them."**
+3. In the left list, click **Randomize ROM** → **Run workflow**.
+   - Leave the seed blank for a random game, or type a number to get a specific,
+     repeatable one.
+   - Click the green **Run workflow** button.
+4. Wait ~3–5 minutes. Click the finished run, scroll down to **Artifacts**, and
+   download **`randomized-rom`**.
+5. Unzip it. Inside is your `pokeemerald_seed<NUMBER>.gba` (the game) and a
+   `.txt` file listing the settings that were used.
 
- [![](https://img.shields.io/github/all-contributors/rh-hideout/pokeemerald-expansion/upcoming)](CREDITS.md)
+To make another seed, just **Run workflow** again. That's it.
 
-If you use **`pokeemerald-expansion`**, please credit **RHH (Rom Hacking Hideout)**. Optionally, include the version number for clarity.
+---
 
+## Option B — Double-click launcher on Windows
+
+This builds the ROM on your own PC. It needs **WSL** (Windows Subsystem for
+Linux) set up once. After that, it's double-click-and-go.
+
+### Step 1 — Install WSL (one time)
+
+1. Click **Start**, type **PowerShell**, right-click it and choose
+   **Run as administrator**.
+2. In the blue window, paste this and press Enter:
+   ```powershell
+   wsl --install
+   ```
+3. **Restart your PC** when it asks.
+4. After restarting, an **Ubuntu** window opens automatically and asks you to
+   create a **username** and **password**. Type any you like.
+   *(The password stays invisible as you type — that's normal. Press Enter.)*
+
+### Step 2 — Install the build tools (one time)
+
+In that **Ubuntu** window, paste this single line and press Enter (type your
+password if asked):
+
+```bash
+sudo apt update && sudo apt install -y build-essential binutils-arm-none-eabi gcc-arm-none-eabi git libpng-dev pkg-config python3
 ```
-Based off RHH's pokeemerald-expansion 1.16.1 https://github.com/rh-hideout/pokeemerald-expansion/
+
+Let it finish. You only ever do Steps 1–2 once.
+
+### Step 3 — Make a ROM
+
+1. Download/clone this project to a folder on your PC.
+2. **Double-click `randomize.bat`.**
+   - For a specific seed, open a Command Prompt in the folder and run
+     `randomize.bat 12345`.
+3. After a few minutes, your ROM appears in the **`roms`** folder as
+   `pokeemerald_seed<NUMBER>.gba`.
+
+Open that `.gba` in an emulator like [mGBA](https://mgba.io/), or copy it to a
+flashcart to play on real hardware.
+
+---
+
+## Changing what gets randomized
+
+Open **`hen_settings.json`** in any text editor and set a value to `false` to
+leave that part untouched:
+
+```json
+{
+  "randomize_wild": true,
+  "randomize_trainers": true,
+  "randomize_starters": true,
+  "unique_starters": true
+}
 ```
 
-Please consider [crediting all contributors](CREDITS.md) involved in the project!
+Handy commands (run in WSL/terminal from the project folder):
 
-# Choosing `pokeemerald` or **`pokeemerald-expansion`**
+```bash
+python3 hen_randomizer.py --show        # view current settings
+python3 hen_randomizer.py --list-pool   # see which Pokémon/generations are included
+```
 
-- **`pokeemerald-expansion`** supports multiplayer functionality with other games built on **`pokeemerald-expansion`**. It is not compatible with official Pokémon games.
-- If compatibility with official games is important, use [`pokeemerald`](https://github.com/pret/pokeemerald). Otherwise, we recommend using **`pokeemerald-expansion`**.
-- **`pokeemerald-expansion`** incorporates regular updates from `pokeemerald`, including bug fixes and documentation improvements.
+---
 
-# [Getting Started](INSTALL.md)
+## Seeds
 
-❗❗ **Important**: Do not use GitHub's "Download Zip" option as it will not include commit history. This is necessary if you want to update or merge other feature branches.
+- The **seed** is the number that decides the randomization. The **same seed
+  always makes the same game** — great for sharing a run with a friend or
+  racing the same layout.
+- Each ROM is saved with its seed in the filename, and a matching `.txt` records
+  the exact settings used.
 
-If you're new to git and GitHub, [Team Aqua's Asset Repo](https://github.com/Pawkkie/Team-Aquas-Asset-Repo/) has a [guide to forking and cloning the repository](https://github.com/Pawkkie/Team-Aquas-Asset-Repo/wiki/The-Basics-of-GitHub). Then you can follow one of the following guides:
+---
 
-## 📥 [Installing **`pokeemerald-expansion`**](INSTALL.md)
-## 🏗️ [Building **`pokeemerald-expansion`**](INSTALL.md#Building-pokeemerald-expansion)
-## 🚚 [Migrating from **`pokeemerald`**](INSTALL.md#Migrating-from-pokeemerald)
-## 🚀 [Updating **`pokeemerald-expansion`**](INSTALL.md#Updating-pokeemerald-expansion)
+## Troubleshooting
 
-# [Documentation](https://rh-hideout.github.io/pokeemerald-expansion/)
+- **`randomize.bat` flashes and closes / "command not found":** WSL isn't set up
+  yet — do Steps 1–2 above.
+- **`bad interpreter` error:** the launcher auto-fixes this, but if you hit it,
+  run `sed -i 's/\r$//' new_seed.sh` once in WSL.
+- **Build fails on the GitHub Action:** open the failed run and copy the error;
+  it's usually a missing build dependency that's quick to add.
 
-For detailed documentation, visit the [pokeemerald-expansion documentation page](https://rh-hideout.github.io/pokeemerald-expansion/).
+---
 
-# [Contributions](CONTRIBUTING.md)
-If you are looking to [report a bug](CONTRIBUTING.md#Bug-Report), [open a pull request](CONTRIBUTING.md#Pull-Requests), or [request a feature](CONTRIBUTING.md#Feature-Request), our [`CONTRIBUTING.md`](CONTRIBUTING.md) has guides for each.
+## Notes
 
-# [Community](https://discord.gg/6CzjAG6GZk)
-
-[![](https://dcbadge.limes.pink/api/server/6CzjAG6GZk)](https://discord.gg/6CzjAG6GZk)
-
-Our community uses the [ROM Hacking Hideout (RHH) Discord server](https://discord.gg/6CzjAG6GZk) to communicate and organize. Most of our discussions take place there, and we welcome anybody to join us!
+- Every seed produces a full new `.gba` — there's no "live" randomization (the
+  same is true of other randomizers).
+- Please share the **project** (this repo), not finished `.gba` files: the source
+  is fine to distribute, but ROMs contain copyrighted game assets.
