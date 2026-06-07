@@ -1,0 +1,40 @@
+name: Randomize ROM
+
+# Lets anyone generate a randomized ROM from the browser:
+#   Actions tab -> "Randomize ROM" -> Run workflow -> (optional seed) -> Run.
+# A few minutes later the ROM is downloadable under the run's "Artifacts".
+on:
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: "Seed number (leave blank for a random seed)"
+        required: false
+        default: ""
+
+jobs:
+  randomize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install build toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential binutils-arm-none-eabi gcc-arm-none-eabi \
+            git libpng-dev pkg-config python3
+
+      - name: Randomize and build
+        run: |
+          chmod +x new_seed.sh
+          ./new_seed.sh "${{ inputs.seed }}"
+
+      - name: Upload randomized ROM
+        uses: actions/upload-artifact@v4
+        with:
+          name: randomized-rom
+          path: roms/
+          if-no-files-found: error
