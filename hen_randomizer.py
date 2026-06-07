@@ -100,6 +100,56 @@ def load_species_pool(species_h, max_species=None, verbose=True):
     return pool
 
 
+# National Dex generation ranges (inclusive), for verifying pool coverage.
+GEN_BOUNDS = [
+    ("Gen 1", 1, 151), ("Gen 2", 152, 251), ("Gen 3", 252, 386),
+    ("Gen 4", 387, 493), ("Gen 5", 494, 649), ("Gen 6", 650, 721),
+    ("Gen 7", 722, 809), ("Gen 8", 810, 905), ("Gen 9", 906, 1025),
+]
+
+
+def parse_species_numbers(species_h):
+    """Return {SPECIES_NAME: dex_number} by tracking enum values
+    (explicit '= N' or auto-increment)."""
+    nums = {}
+    val = -1
+    with open(species_h, encoding="utf-8") as f:
+        for line in f:
+            m = re.match(r"^\s*(SPECIES_[A-Z0-9_]+)\s*(?:=\s*([0-9]+))?\s*,", line)
+            if not m:
+                continue
+            if m.group(2) is not None:
+                val = int(m.group(2))
+            else:
+                val += 1
+            nums.setdefault(m.group(1), val)
+    return nums
+
+
+def list_pool_by_generation(species_h, max_species=None):
+    pool = load_species_pool(species_h, max_species, verbose=False)
+    nums = parse_species_numbers(species_h)
+    print(f"Species pool: {len(pool)} eligible base species\n")
+    buckets = {name: 0 for name, _, _ in GEN_BOUNDS}
+    other = 0
+    for sp in pool:
+        n = nums.get(sp)
+        placed = False
+        if n is not None:
+            for name, lo, hi in GEN_BOUNDS:
+                if lo <= n <= hi:
+                    buckets[name] += 1
+                    placed = True
+                    break
+        if not placed:
+            other += 1
+    for name, lo, hi in GEN_BOUNDS:
+        bar = "#" * (buckets[name] // 5)
+        print(f"  {name}  (#{lo}-{hi}): {buckets[name]:4}  {bar}")
+    if other:
+        print(f"  Custom/other        : {other:4}  (fork additions / unranged)")
+
+
 # --------------------------------------------------------------------------- #
 #  Wild Pokemon (wild_encounters.json)
 # --------------------------------------------------------------------------- #
@@ -191,7 +241,7 @@ def randomize_trainers(path, pool, rng):
 # --------------------------------------------------------------------------- #
 #  Starters (src/starter_choose.c)
 # --------------------------------------------------------------------------- #
-def randomize_starters(path, pool, rng):
+def randomize_starters(path, pool, rng, unique=True):
     with open(path, encoding="utf-8") as f:
         text = f.read()
     m = re.search(r"(sStarterMon\s*\[[^\]]*\]\s*=\s*\{)(.*?)(\};)", text, re.DOTALL)
@@ -200,7 +250,10 @@ def randomize_starters(path, pool, rng):
         return
     head, body, tail = m.group(1), m.group(2), m.group(3)
     n = len(re.findall(r"SPECIES_|STARTER", body)) or 3
-    picks = rng.sample(pool, min(n, len(pool)))   # unique starters
+    if unique:
+        picks = rng.sample(pool, min(n, len(pool)))
+    else:
+        picks = [rng.choice(pool) for _ in range(n)]
     new_body = "\n    " + ",\n    ".join(picks) + ",\n"
     text = text[:m.start()] + head + new_body + tail + text[m.end():]
     with open(path, "w", encoding="utf-8") as f:
@@ -209,19 +262,83 @@ def randomize_starters(path, pool, rng):
 
 
 # --------------------------------------------------------------------------- #
+#  Settings
+# --------------------------------------------------------------------------- #
+DEFAULT_SETTINGS = {
+    "randomize_wild": True,
+    "randomize_trainers": True,
+    "randomize_starters": True,
+    "unique_starters": True,
+}
+SETTINGS_HELP = {
+    "randomize_wild": "Randomize wild Pokemon encounters",
+    "randomize_trainers": "Randomize trainer (foe) Pokemon",
+    "randomize_starters": "Randomize the three starter Pokemon",
+    "unique_starters": "Force the starters to be three different species",
+}
+
+
+def load_settings(path):
+    settings = dict(DEFAULT_SETTINGS)
+    if path and os.path.isfile(path):
+        with open(path, encoding="utf-8") as f:
+            user = json.load(f)
+        for k in DEFAULT_SETTINGS:
+            if k in user:
+                settings[k] = user[k]
+    return settings
+
+
+def write_default_settings(path):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(DEFAULT_SETTINGS, f, indent=2)
+        f.write("\n")
+    print(f"Wrote default settings to {path}")
+
+
+# --------------------------------------------------------------------------- #
 def main():
     ap = argparse.ArgumentParser(description="Hen-style source randomizer for pokeemerald-expansion")
-    ap.add_argument("--seed", type=int, default=None, help="seed for reproducible runs")
+    ap.add_argument("--seed", type=int, default=None,
+                    help="seed for reproducible runs (random if omitted)")
     ap.add_argument("--root", default=".", help="project root (default: current dir)")
-    ap.add_argument("--max-species", type=int, default=None,
-                    help="cap species pool to first N (debug)")
-    ap.add_argument("--skip", default="", help="comma list: wild,trainers,starters")
+    ap.add_argument("--settings", default=None,
+                    help="path to settings JSON (default: <root>/hen_settings.json)")
+    ap.add_argument("--show", action="store_true",
+                    help="print the resolved settings and the seed, then exit")
+    ap.add_argument("--list-pool", action="store_true",
+                    help="print the species pool broken down by generation, then exit")
+    ap.add_argument("--init-settings", action="store_true",
+                    help="write a default hen_settings.json you can edit, then exit")
+    ap.add_argument("--manifest", default=None,
+                    help="write a JSON record of seed+settings used (for sharing/viewing)")
+    ap.add_argument("--max-species", type=int, default=None, help="cap pool to first N (debug)")
     args = ap.parse_args()
 
-    rng = random.Random(args.seed)
-    skip = {s.strip() for s in args.skip.split(",") if s.strip()}
     root = args.root
+    settings_path = args.settings or os.path.join(root, "hen_settings.json")
 
+    if args.init_settings:
+        write_default_settings(settings_path)
+        return
+
+    if args.list_pool:
+        list_pool_by_generation(os.path.join(root, "include/constants/species.h"),
+                                args.max_species)
+        return
+
+    settings = load_settings(settings_path)
+    seed = args.seed if args.seed is not None else random.randrange(1, 2**31 - 1)
+
+    if args.show:
+        src = settings_path if os.path.isfile(settings_path) else "built-in defaults"
+        print(f"Randomization settings (from {src}):")
+        for k in DEFAULT_SETTINGS:
+            print(f"  {k:20} = {str(settings[k]):5}   # {SETTINGS_HELP[k]}")
+        print(f"  {'seed (this run)':20} = {seed}")
+        return
+
+    rng = random.Random(seed)
     species_h = os.path.join(root, "include/constants/species.h")
     wild_json = os.path.join(root, "src/data/wild_encounters.json")
     trainers  = os.path.join(root, "src/data/trainers.party")
@@ -230,15 +347,24 @@ def main():
     if not os.path.isfile(species_h):
         sys.exit(f"ERROR: {species_h} not found -- run from project root or pass --root")
 
-    print(f"Seed: {args.seed}")
+    print(f"Seed: {seed}")
     pool = load_species_pool(species_h, args.max_species)
 
-    if "wild" not in skip and os.path.isfile(wild_json):
-        randomize_wild(wild_json, pool, rng)
-    if "trainers" not in skip and os.path.isfile(trainers):
-        randomize_trainers(trainers, pool, rng)
-    if "starters" not in skip and os.path.isfile(starters):
-        randomize_starters(starters, pool, rng)
+    did = []
+    if settings["randomize_wild"] and os.path.isfile(wild_json):
+        randomize_wild(wild_json, pool, rng); did.append("wild")
+    if settings["randomize_trainers"] and os.path.isfile(trainers):
+        randomize_trainers(trainers, pool, rng); did.append("trainers")
+    if settings["randomize_starters"] and os.path.isfile(starters):
+        randomize_starters(starters, pool, rng, settings["unique_starters"]); did.append("starters")
+
+    if args.manifest:
+        with open(args.manifest, "w", encoding="utf-8") as f:
+            json.dump({"seed": seed, "randomized": did,
+                       "species_pool_size": len(pool), "settings": settings},
+                      f, indent=2)
+            f.write("\n")
+        print(f"  manifest: {args.manifest}")
 
     print("Done. Now rebuild:  make -j$(nproc)")
 
